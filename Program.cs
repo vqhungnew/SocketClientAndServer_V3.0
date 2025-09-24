@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -12,295 +10,217 @@ namespace SocketClientAndServer
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("You are running Socket Programming Version 3.0: \n" +
-                "- Easy to understand a few technical items.\n" +
-                "- BASIC commands.\n" +
-                "- No typing CONVERSATION between Server & Client\n" +
-                "- MUST ENTER SERVER'S IP to run.\n" +
-                "- MUST Select PORT to run.\n" +
-                "- CLIENT can Send multi text.Server send Automatically predefined message\n"+
-                "- SERVER can Answer clients.\n");
+            // Intro message
+            Console.WriteLine("You are running Socket Programming Version 3.3: \n" +
+                "- Supports Client and Server roles.\n" +
+                "- Real-time chat (both sides send & receive instantly).\n" +
+                "- Works over TCP sockets on LAN.\n");
 
-            string role_1 = "Client";
-            string role_2 = "Server";
-            string your_role = "You choose to be NOTHING. BB and See you again";
+            // Show role options
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("\nWelcome to Socket programming");
             Console.WriteLine("Please select your ROLE (enter 1 or 2):");
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.Write("\n 1." + role_1 + "   ");
+            Console.WriteLine(" 1. Client");
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Write("2." + role_2 + "\n");
+            Console.WriteLine(" 2. Server");
             Console.ForegroundColor = ConsoleColor.White;
-            string your_choice = null;
-            your_choice = Console.ReadLine();   //Wait for a character from keyboard
-            switch (your_choice)
+
+            string choice = Console.ReadLine();
+
+            switch (choice)
             {
                 case "1":
-                    your_role = role_1;
-
-                    Console.WriteLine("\nYou select your ROLE: " + your_choice + ":" + your_role);
                     showIpAddress();
                     runAsClient();
-                    //Select IP to run by ORDER
-                   
                     break;
                 case "2":
-                    your_role = role_2;
-
-                    Console.WriteLine("\nYou select your ROLE: " + your_choice + ":" + your_role);
                     showIpAddress();
                     runAsServer();
                     break;
+                default:
+                    Console.WriteLine("Invalid choice, exiting...");
+                    break;
             }
-
-            Console.WriteLine("\nYou select your ROLE: " + your_choice + ":" + your_role + "\n");
-
-
-            Console.ReadLine(); // Wait ENTER to exit
-
         }
+
+        /// <summary>
+        /// CLIENT SIDE
+        /// - Connects to a server IP:Port
+        /// - Runs 2 loops:
+        ///   (1) Input loop: read user input & send to server
+        ///   (2) Listening loop: always receives & prints server messages
+        /// </summary>
         static void runAsClient()
         {
-
             try
             {
-
-                // Establish the remote endpoint 
-                // for the socket. This example 
-                // uses port 11111 on the local 
-                // computer.
-                IPHostEntry ipHost = Dns.GetHostEntry(Dns.GetHostName());
-                Console.WriteLine("\nEnter the SERVER's IP (x.x.x.x) you want to use:");
-                //int addOrder = Int16.Parse(Console.ReadLine());
+                // Ask for server IP
+                Console.WriteLine("\nEnter the SERVER's IP (x.x.x.x):");
                 string ipServer = Console.ReadLine();
-                IPAddress ipAddr = IPAddress.Parse(ipServer); //AddressList[addOrder];
-                Console.WriteLine("You are using IP:" + ipAddr.ToString());
+                IPAddress ipAddr = IPAddress.Parse(ipServer);
 
-                //Select PORT to run, default PORT:8888
-                Console.WriteLine("Enter the PORT you want to use (1024-65535):");
-                int portToRun = Convert.ToInt32(Console.ReadLine());
-                if (portToRun > 1023 & portToRun < 65535)
-                {
-                    //Keep the port USER entered.
-                }
-                else
+                // Ask for port (default 8888)
+                Console.WriteLine("Enter the PORT you want to use (1024-65535, default=8888):");
+                int portToRun;
+                if (!int.TryParse(Console.ReadLine(), out portToRun) || portToRun < 1024 || portToRun > 65535)
                 {
                     portToRun = 8888;
                 }
+
+                // Connect socket
+                IPEndPoint remoteEndPoint = new IPEndPoint(ipAddr, portToRun);
+                Socket sender = new Socket(ipAddr.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                sender.Connect(remoteEndPoint);
+
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Connected to Server -> {0}", sender.RemoteEndPoint.ToString());
+
+                // THREAD 1: Listening loop (background task)
+                Task.Run(() =>
                 {
-                    Console.WriteLine("You selected PORT:" + portToRun);
-                }
-                IPEndPoint localEndPoint = new IPEndPoint(ipAddr, portToRun);
-
-                // Creation TCP/IP Socket using 
-                // Socket Class Constructor
-                Socket sender = new Socket(ipAddr.AddressFamily,
-                           SocketType.Stream, ProtocolType.Tcp);
-
-                try
-                {
-
-                    // Connect Socket to the remote 
-                    // endpoint using method Connect()
-                    sender.Connect(localEndPoint);
-
-                    // We print EndPoint information 
-                    // that we are connected
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("Socket connected to -> {0} ", sender.RemoteEndPoint.ToString());
-
-                    // Creation of message that
-                    // we will send to Server
-                    byte[] messageSent = Encoding.ASCII.GetBytes("Test Client<EOF>");
-                    int byteSent = sender.Send(messageSent);
-
-                    // Data buffer
-                    byte[] messageReceived = new byte[1024];
-
-                    // We receive the message using 
-                    // the method Receive(). This 
-                    // method returns number of bytes
-                    // received, that we'll use to 
-                    // convert them to string
-                    int byteRecv = sender.Receive(messageReceived);
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine("Message from Server -> {0}", Encoding.ASCII.GetString(messageReceived, 0, byteRecv));
-
-
-                    while (true)    // Make a LOOP to WAIT user TEXT, after that SEND to Server
+                    while (true)
                     {
-                        //Client send Message to Server/Listenner
-                        Console.ForegroundColor = ConsoleColor.White;
-                        Console.WriteLine("\n Start CHATING by ENTER Something");
+                        try
+                        {
+                            byte[] buffer = new byte[1024];
+                            int byteRecv = sender.Receive(buffer);
+                            string serverMsg = Encoding.ASCII.GetString(buffer, 0, byteRecv);
 
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        string userMes = Console.ReadLine();
-
-                        messageSent = Encoding.ASCII.GetBytes(userMes + " <EOF>");
-                        byteSent = sender.Send(messageSent);
-
-                        //listen form Server
-                        byteRecv = sender.Receive(messageReceived);
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        //Console.WriteLine("Message from Server -> {0}",Encoding.ASCII.GetString(messageReceived,0, byteRecv));
-                        Console.WriteLine("Server:", Encoding.ASCII.GetString(messageReceived, 0, byteRecv));
-
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+                            Console.WriteLine("\nServer: " + serverMsg);
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.Write("Client> "); // keep input prompt visible
+                        }
+                        catch
+                        {
+                            Console.WriteLine("\nConnection closed by server.");
+                            break;
+                        }
                     }
+                });
 
-                    // Close Socket using 
-                    // the method Close()
-                    sender.Shutdown(SocketShutdown.Both);
-                    sender.Close();
-                }
-
-                // Manage of Socket's Exceptions
-                catch (ArgumentNullException ane)
+                // THREAD 2 (main): Input loop (send messages)
+                while (true)
                 {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.Write("Client> ");
+                    string userMes = Console.ReadLine();
 
-                    Console.WriteLine("ArgumentNullException : {0}", ane.ToString());
-                }
-
-                catch (SocketException se)
-                {
-
-                    Console.WriteLine("SocketException : {0}", se.ToString());
-                }
-
-                catch (Exception e)
-                {
-                    Console.WriteLine("Unexpected exception : {0}", e.ToString());
+                    if (!string.IsNullOrEmpty(userMes))
+                    {
+                        byte[] messageSent = Encoding.ASCII.GetBytes(userMes + " <EOF>");
+                        sender.Send(messageSent);
+                    }
                 }
             }
-
             catch (Exception e)
             {
-
-                Console.WriteLine(e.ToString());
+                Console.WriteLine("Client error: " + e.Message);
             }
         }
 
-        static void showIpAddress()  // https://stackoverflow.com/questions/6803073/get-local-ip-address
+        /// <summary>
+        /// SERVER SIDE
+        /// - Binds to local IP + Port
+        /// - Accepts one client
+        /// - Runs 2 loops:
+        ///   (1) Input loop: server user types messages to send
+        ///   (2) Listening loop: always receives & prints client messages
+        /// </summary>
+        static void runAsServer()
         {
-            String strHostName = string.Empty;
-            // Getting Ip address of local machine...
-            // First get the host name of local machine.
-            strHostName = Dns.GetHostName();
-            Console.WriteLine("Local Machine's Host Name: " + strHostName);
-            // Then using host name, get the IP address list..
-            IPHostEntry ipEntry = Dns.GetHostEntry(strHostName);
+            try
+            {
+                // Get available local IP addresses
+                IPHostEntry ipHost = Dns.GetHostEntry(Dns.GetHostName());
+                Console.WriteLine("Enter the IP index to bind for SERVER Role:");
+                int addOrder = Int16.Parse(Console.ReadLine());
+                IPAddress ipAddr = ipHost.AddressList[addOrder];
+                Console.WriteLine("You are using IP:" + ipAddr.ToString());
 
+                // Ask for port (default 8888)
+                Console.WriteLine("Enter the PORT you want to use (1024-65535, default=8888):");
+                int portToRun;
+                if (!int.TryParse(Console.ReadLine(), out portToRun) || portToRun < 1024 || portToRun > 65535)
+                {
+                    portToRun = 8888;
+                }
+                Console.WriteLine("You selected PORT:" + portToRun);
+
+                // Create endpoint and socket
+                IPEndPoint localEndPoint = new IPEndPoint(ipAddr, portToRun);
+                Socket listener = new Socket(ipAddr.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+
+                listener.Bind(localEndPoint);
+                listener.Listen(10);
+
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.WriteLine("Waiting for client connection...");
+
+                // Accept one client
+                Socket clientSocket = listener.Accept();
+                Console.WriteLine("Client connected!");
+
+                // THREAD 1: Input loop (server typing)
+                Task.Run(() =>
+                {
+                    while (true)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.Write("Server> ");
+                        string serverMsg = Console.ReadLine();
+
+                        if (!string.IsNullOrEmpty(serverMsg))
+                        {
+                            byte[] message = Encoding.ASCII.GetBytes(serverMsg + " <EOF>");
+                            clientSocket.Send(message);
+                        }
+                    }
+                });
+
+                // THREAD 2 (main): Listening loop (receive messages)
+                while (true)
+                {
+                    try
+                    {
+                        byte[] buffer = new byte[1024];
+                        int numByte = clientSocket.Receive(buffer);
+                        string data = Encoding.ASCII.GetString(buffer, 0, numByte);
+
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine("\nClient: {0}", data);
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.Write("Server> "); // keep prompt visible
+                    }
+                    catch
+                    {
+                        Console.WriteLine("\nClient disconnected.");
+                        break;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Server error: " + e.Message);
+            }
+        }
+
+        /// <summary>
+        /// Utility function:
+        /// Displays all local IP addresses so the user can select the correct one.
+        /// </summary>
+        static void showIpAddress()
+        {
+            string strHostName = Dns.GetHostName();
+            Console.WriteLine("Local Machine's Host Name: " + strHostName);
+
+            IPHostEntry ipEntry = Dns.GetHostEntry(strHostName);
             IPAddress[] addr = ipEntry.AddressList;
 
             for (int i = 0; i < addr.Length; i++)
             {
-                Console.WriteLine("IP Address {0}: {1} ", i, addr[i].ToString());
+                Console.WriteLine("IP Address {0}: {1}", i, addr[i].ToString());
             }
-            //return ;
-            //Console.ReadLine();
-        }
-
-        static void runAsServer()
-        {
-
-            // Establish the local endpoint 
-            // for the socket. Dns.GetHostName
-            // returns the name of the host 
-            // running the application.
-            IPHostEntry ipHost = Dns.GetHostEntry(Dns.GetHostName());
-
-            //Select IP to run by ORDER
-            Console.WriteLine("Enter the IP you want to use for SERVER Role:");
-            int addOrder = Int16.Parse(s: Console.ReadLine());
-            IPAddress ipAddr = ipHost.AddressList[addOrder];
-            Console.WriteLine("You are using IP:" + ipAddr.ToString());
-
-
-            //Select PORT to run, default PORT:8888
-            Console.WriteLine("Enter the PORT you want to use (1024-65535):");
-            int portToRun = Convert.ToInt32(Console.ReadLine());
-            if (portToRun > 1023 & portToRun < 65535)
-            {
-                //Keep the port USER entered.
-            }
-            else
-            {
-                portToRun = 8888;
-            }
-            {
-                Console.WriteLine("You selected PORT:" + portToRun + "\n");
-            }
-            IPEndPoint localEndPoint = new IPEndPoint(ipAddr, portToRun);
-
-            // Creation TCP/IP Socket using 
-            // Socket Class Constructor
-            Socket listener = new Socket(ipAddr.AddressFamily,SocketType.Stream, ProtocolType.Tcp);
-
-            try
-            {
-
-                // Using Bind() method we associate a
-                // network address to the Server Socket
-                // All client that will connect to this 
-                // Server Socket must know this network
-                // Address
-                listener.Bind(localEndPoint);
-
-                // Using Listen() method we create 
-                // the Client list that will want
-                // to connect to Server
-                listener.Listen(10);
-
-                Socket clientSocket = listener.Accept();
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine("Waiting connection ... ");
-                while (true)
-                {
-                    
-                    // Suspend while waiting for
-                    // incoming connection Using 
-                    // Accept() method the server 
-                    // will accept connection of client
-
-
-                    // Data buffer
-                    byte[] bytes = new Byte[1024];
-                    string data = null;
-
-                    while (true)
-                    {
-
-                        int numByte = clientSocket.Receive(bytes);
-
-                        data += Encoding.ASCII.GetString(bytes,0, numByte);
-
-                        if (data.IndexOf("<EOF>") > -1)
-                            break;
-                    }
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine("Text received -> {0} ", data);
-                    //byte[] message = Encoding.ASCII.GetBytes("Test Server");
-                    byte[] message = Encoding.ASCII.GetBytes(s: Console.ReadLine());
-
-                    // Send a message to Client 
-                    // using Send() method
-                    clientSocket.Send(message);
-
-                    // Close client Socket using the
-                    // Close() method. After closing,
-                    // we can use the closed Socket 
-                    // for a new Client Connection
-
-                }
-                clientSocket.Shutdown(SocketShutdown.Both);
-                clientSocket.Close();
-            }
-
-            catch (Exception e)
-            {
-                Console.WriteLine(e.ToString());
-            }
-
         }
     }
 }
